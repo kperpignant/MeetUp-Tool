@@ -35,12 +35,46 @@ Next.js app for running a local **Unity** meetup: public calendar and event page
 
    Open [http://localhost:3000](http://localhost:3000). Organizers sign in via **Organizer login** → `/login`.
 
-## Deploy (Vercel + Atlas)
+## Deploy
 
-1. Create an Atlas cluster and user; set `MONGODB_URI` in Vercel project **Environment Variables**.
-2. Set the same auth variables in Vercel. Use production `NEXTAUTH_URL` / `AUTH_URL` (e.g. `https://your-app.vercel.app`).
-3. In Google OAuth credentials, add redirect URI: `https://your-app.vercel.app/api/auth/callback/google`.
-4. Deploy from Git with `vercel` or the Vercel GitHub integration.
+The same checklist applies to **Render**, **Vercel**, **Fly.io**, etc.
+
+1. **Atlas**
+
+   - Create a cluster and database user.
+   - In **Network Access**, add your host's outbound IP — or `0.0.0.0/0` for managed PaaS providers like Render whose egress IPs change.
+
+2. **Environment variables** (in your provider's dashboard)
+
+   | Var | Value |
+   |---|---|
+   | `MONGODB_URI` | Atlas connection string |
+   | `AUTH_SECRET` | random 32-byte base64 string |
+   | `NEXTAUTH_URL` | **Public HTTPS URL** of your deploy, no trailing slash, e.g. `https://your-app.onrender.com` |
+   | `AUTH_URL` | Same as `NEXTAUTH_URL` (Auth.js v5 reads both) |
+   | `AUTH_TRUST_HOST` | `true` (required behind a reverse proxy) |
+   | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | from Google Cloud Console |
+   | `ORGANIZER_EMAILS` | comma-separated emails allowed into `/dashboard` |
+
+3. **Google OAuth client** (Google Cloud Console → APIs & Services → Credentials)
+
+   On the same OAuth 2.0 Web client used for local dev, add the production URLs in **addition** to the localhost ones:
+
+   - **Authorized JavaScript origins**: `https://your-app.onrender.com`
+   - **Authorized redirect URIs**: `https://your-app.onrender.com/api/auth/callback/google`
+
+   The redirect URI must match byte-for-byte (no trailing slash, exact scheme + host + port).
+
+   If your OAuth consent screen is in **Testing** mode, also add every sign-in email under **Test users**.
+
+4. **Deploy** from Git. After it boots, sign in once at `/login` and check that the URL in Google's address bar contains `redirect_uri=https%3A%2F%2Fyour-app.onrender.com%2F...` — **not** `localhost`.
+
+### Common deploy errors
+
+- `Unsafe attempt to load URL http://localhost:3000/...` after Google sign-in → `NEXTAUTH_URL` / `AUTH_URL` on the host are still set to `localhost`.
+- `redirect_uri_mismatch` from Google → the production URI isn't in the OAuth client's authorized redirect URIs (or has a typo / trailing slash).
+- `MissingSecret` → `AUTH_SECRET` not set in the deployed environment.
+- DB connect hangs / `ECONNREFUSED` → Atlas Network Access is missing the deploy's egress IP.
 
 ## Features (MVP)
 
